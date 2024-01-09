@@ -401,6 +401,7 @@ void Costmap2DROS::setUnpaddedRobotFootprint(const std::vector<geometry_msgs::Po
   padded_footprint_ = points;
   padFootprint(padded_footprint_, footprint_padding_);
 
+  // 设置footprint
   layered_costmap_->setFootprint(padded_footprint_);
 }
 

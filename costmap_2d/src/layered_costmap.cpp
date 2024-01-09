@@ -134,10 +134,13 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
                         prev_minx, prev_miny, prev_maxx , prev_maxy,
                         minx_, miny_, maxx_ , maxy_,
                         (*plugin)->getName().c_str());
+      
     }
   }
 
   int x0, xn, y0, yn;
+  
+  // 将边界坐标转换成map 图片坐标
   costmap_.worldToMapEnforceBounds(minx_, miny_, x0, y0);
   costmap_.worldToMapEnforceBounds(maxx_, maxy_, xn, yn);
 
@@ -151,6 +154,7 @@ void LayeredCostmap::updateMap(double robot_x, double robot_y, double robot_yaw)
   if (xn < x0 || yn < y0)
     return;
 
+  // 重新设置边界区域内的方格的代价值，设置为默认值
   costmap_.resetMap(x0, y0, xn, yn);
   for (vector<boost::shared_ptr<Layer> >::iterator plugin = plugins_.begin(); plugin != plugins_.end();
        ++plugin)

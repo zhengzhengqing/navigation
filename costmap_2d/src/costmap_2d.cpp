@@ -233,6 +233,8 @@ void Costmap2D::worldToMapEnforceBounds(double wx, double wy, int& mx, int& my) 
   // Here we avoid doing any math to wx,wy before comparing them to
   // the bounds, so their values can go out to the max and min values
   // of double floating point.
+
+  // 最小值是否超出了地图左下角x 边界
   if (wx < origin_x_)
   {
     mx = 0;

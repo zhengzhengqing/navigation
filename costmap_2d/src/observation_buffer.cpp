@@ -133,6 +133,7 @@ void ObservationBuffer::bufferCloud(const sensor_msgs::PointCloud2& cloud)
     // 这行代码将传感器坐标系的原点在全局坐标系中的坐标信息转换并存储到观测列表（observation_list_）
     // 的第一个观测（observation_list_.front()）的原点属性（origin_）中
     // 传感器坐标系原点 在世界坐标系下的位置，保存在origin_中
+    // 机器人是移动的， 所以不同时刻的origin_ 是不同，也就不是不同激光帧的origin_ 是不同的
     tf2::convert(global_origin.point, observation_list_.front().origin_);
 
     // make sure to pass on the raytrace/obstacle range of the observation buffer to the observations

@@ -354,6 +354,9 @@ void ObstacleLayer::pointCloud2Callback(const sensor_msgs::PointCloud2ConstPtr& 
   buffer->unlock();
 }
 
+
+// 该函数主要做的工作是： 1：射线追踪，将射线路径上的格子的代价值设置为FREE， 2：将点云所在的位置转换成地图图片坐标系，
+// 设置该坐标处的代价值为 OBSTACLE
 void ObstacleLayer::updateBounds(double robot_x, double robot_y, double robot_yaw, double* min_x,
                                           double* min_y, double* max_x, double* max_y)
 {
@@ -378,6 +381,7 @@ void ObstacleLayer::updateBounds(double robot_x, double robot_y, double robot_ya
   current_ = current;
 
   // raytrace freespace
+  // 射线追踪，计算射线的轨迹，将轨迹上的障碍物清除（言外之意就是射线能够通过说明射线路径上没有障碍物）
   for (unsigned int i = 0; i < clearing_observations.size(); ++i)
   {
     raytraceFreespace(clearing_observations[i], min_x, min_y, max_x, max_y);
@@ -396,11 +400,13 @@ void ObstacleLayer::updateBounds(double robot_x, double robot_y, double robot_ya
     sensor_msgs::PointCloud2ConstIterator<float> iter_y(cloud, "y");
     sensor_msgs::PointCloud2ConstIterator<float> iter_z(cloud, "z");
 
+    // 遍历所有点云数据
     for (; iter_x !=iter_x.end(); ++iter_x, ++iter_y, ++iter_z)
     {
       double px = *iter_x, py = *iter_y, pz = *iter_z;
 
       // if the obstacle is too high or too far away from the robot we won't add it
+      // 高度超过了最大障碍物高度，则忽略
       if (pz > max_obstacle_height_)
       {
         ROS_DEBUG("The point is too high");
@@ -419,6 +425,7 @@ void ObstacleLayer::updateBounds(double robot_x, double robot_y, double robot_ya
       }
 
       // now we need to compute the map coordinates for the observation
+      // 计算出该点云x, y 坐标在时间地图坐标系下的位置
       unsigned int mx, my;
       if (!worldToMap(px, py, mx, my))
       {
@@ -426,6 +433,7 @@ void ObstacleLayer::updateBounds(double robot_x, double robot_y, double robot_ya
         continue;
       }
 
+      // 将该位置处的代价值设置为 有障碍物
       unsigned int index = getIndex(mx, my);
       costmap_[index] = LETHAL_OBSTACLE;
       touch(px, py, min_x, min_y, max_x, max_y);
@@ -449,7 +457,9 @@ void ObstacleLayer::updateFootprint(double robot_x, double robot_y, double robot
 
 void ObstacleLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, int min_j, int max_i, int max_j)
 {
-  if (footprint_clearing_enabled_)
+  // 如果启用了 footprint_clearing（即 footprint_clearing_enabled_ 为 true），则调用 setConvexPolygonCost 方法，
+  // 将 transformed_footprint_ 所表示的凸多边形的区域标记为 costmap_2d::FREE_SPACE。这通常是用于清除机器人足迹所覆盖的区域，将其标记为自由空间。
+  if (footprint_clearing_enabled_) 
   {
     setConvexPolygonCost(transformed_footprint_, costmap_2d::FREE_SPACE);
   }
@@ -518,6 +528,7 @@ bool ObstacleLayer::getClearingObservations(std::vector<Observation>& clearing_o
   return current;
 }
 
+// 射线跟踪， 将射线路径上的格子的代价值设置为FREE SPACE
 void ObstacleLayer::raytraceFreespace(const Observation& clearing_observation, double* min_x, double* min_y,
                                               double* max_x, double* max_y)
 {
@@ -556,6 +567,7 @@ void ObstacleLayer::raytraceFreespace(const Observation& clearing_observation, d
 
   for (; iter_x != iter_x.end(); ++iter_x, ++iter_y)
   {
+    // 点云在 世界坐标系下的坐标
     double wx = *iter_x;
     double wy = *iter_y;
 

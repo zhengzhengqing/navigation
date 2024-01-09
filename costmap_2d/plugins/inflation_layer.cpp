@@ -175,7 +175,7 @@ void InflationLayer::onFootprintChanged()
   cell_inflation_radius_ = cellDistance(inflation_radius_);
   computeCaches();
   need_reinflation_ = true;
-
+ 
   ROS_DEBUG("InflationLayer::onFootprintChanged(): num footprint points: %lu,"
             " inscribed_radius_ = %.3f, inflation_radius_ = %.3f",
             layered_costmap_->getFootprint().size(), inscribed_radius_, inflation_radius_);
@@ -190,7 +190,10 @@ void InflationLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, 
   // make sure the inflation list is empty at the beginning of the cycle (should always be true)
   ROS_ASSERT_MSG(inflation_cells_.empty(), "The inflation list must be empty at the beginning of inflation");
 
+  
   unsigned char* master_array = master_grid.getCharMap();
+  
+  // 如果是全局代价地图，返回的是静态地图的大小
   unsigned int size_x = master_grid.getSizeInCellsX(), size_y = master_grid.getSizeInCellsY();
 
   if (seen_ == NULL) {
@@ -226,6 +229,8 @@ void InflationLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, 
 
   // Start with lethal obstacles: by definition distance is 0.0
   std::vector<CellData>& obs_bin = inflation_cells_[0.0];
+
+  //将该致命障碍物单元格的信息添加到 obs_bin 列表中。这包括单元格的索引、X坐标、Y坐标以及源X和源Y坐标，其中源X和源Y坐标的值与当前X和Y坐标相同
   for (int j = min_j; j < max_j; j++)
   {
     for (int i = min_i; i < max_i; i++)
@@ -244,6 +249,7 @@ void InflationLayer::updateCosts(costmap_2d::Costmap2D& master_grid, int min_i, 
   std::map<double, std::vector<CellData> >::iterator bin;
   for (bin = inflation_cells_.begin(); bin != inflation_cells_.end(); ++bin)
   {
+    // 便利obs_bin 中的数据，里面保存了很多 CellData 变量
     for (int i = 0; i < bin->second.size(); ++i)
     {
       // process all cells at distance dist_bin.first
