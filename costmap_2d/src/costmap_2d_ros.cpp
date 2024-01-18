@@ -555,6 +555,7 @@ void Costmap2DROS::resetLayers()
   }
 }
 
+// 获取机器人在世界坐标系下位置
 bool Costmap2DROS::getRobotPose(geometry_msgs::PoseStamped& global_pose) const
 {
   tf2::toMsg(tf2::Transform::getIdentity(), global_pose.pose);

@@ -112,6 +112,7 @@ namespace move_base {
     controller_plan_ = new std::vector<geometry_msgs::PoseStamped>();
 
     //set up the planner's thread
+
     // 规划线程
     planner_thread_ = new boost::thread(boost::bind(&MoveBase::planThread, this));
 
@@ -745,6 +746,7 @@ namespace move_base {
         c_freq_change_ = false;
       }
 
+      // 检查是不是有新的导航任务，如果有会把之前的导航任务抢占
       if(as_->isPreemptRequested()){
         if(as_->isNewGoalAvailable()){
           //if we're active and a new goal is available, we'll accept it, but we won't shut anything down
@@ -759,6 +761,8 @@ namespace move_base {
 
           //we'll make sure that we reset our state for the next execution cycle
           recovery_index_ = 0;
+
+          // 设置状态机
           state_ = PLANNING;
 
           //we have a new goal so make sure the planner is awake
@@ -888,6 +892,7 @@ namespace move_base {
     }
 
     //if we have a new plan then grab it and give it to the controller
+    // 规划线程 planThread 每成功执行一次全局规划，就把new_global_plan_ 设置为true
     if(new_global_plan_){
       //make sure to set the new plan flag to false
       new_global_plan_ = false;
@@ -898,11 +903,14 @@ namespace move_base {
       std::vector<geometry_msgs::PoseStamped>* temp_plan = controller_plan_;
 
       boost::unique_lock<boost::recursive_mutex> lock(planner_mutex_);
+
+      // latest_plan_ 里保存的是全局规划的路径点
       controller_plan_ = latest_plan_;
       latest_plan_ = temp_plan;
       lock.unlock();
       ROS_DEBUG_NAMED("move_base","pointers swapped!");
 
+      // 将全局路径规划的路径保存在 global_plan_ 中
       if(!tc_->setPlan(*controller_plan_)){
         //ABORT and SHUTDOWN COSTMAPS
         ROS_ERROR("Failed to pass global plan to the controller, aborting.");
@@ -953,6 +961,7 @@ namespace move_base {
         }
 
         //check for an oscillation condition
+        // 检测振荡
         if(oscillation_timeout_ > 0.0 &&
             last_oscillation_reset_ + ros::Duration(oscillation_timeout_) < ros::Time::now())
         {

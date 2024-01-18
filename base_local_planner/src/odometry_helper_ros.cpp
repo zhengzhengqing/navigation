@@ -64,7 +64,7 @@ void OdometryHelperRos::getOdom(nav_msgs::Odometry& base_odom) {
   base_odom = base_odom_;
 }
 
-
+// 获取机器人当前的速度
 void OdometryHelperRos::getRobotVel(geometry_msgs::PoseStamped& robot_vel) {
   // Set current velocities from odometry
   geometry_msgs::Twist global_vel;

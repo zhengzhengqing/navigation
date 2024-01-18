@@ -52,8 +52,12 @@ PLUGINLIB_EXPORT_CLASS(global_planner::GlobalPlanner, nav_core::BaseGlobalPlanne
 namespace global_planner {
 
 void GlobalPlanner::outlineMap(unsigned char* costarr, int nx, int ny, unsigned char value) {
+    // 第一个循环将数组的第一行（上边界）的所有元素都设置为 value。
+    // 第二个循环将数组的最后一行（下边界）的所有元素都设置为 value。
+    // 第三个循环将数组的第一列（左边界）的所有元素都设置为 value。
+    // 第四个循环将数组的最后一列（右边界）的所有元素都设置为 value。
     unsigned char* pc = costarr;
-    for (int i = 0; i < nx; i++)
+    for (int xi = 0; i < n; i++)
         *pc++ = value;
     pc = costarr + (ny - 1) * nx;
     for (int i = 0; i < nx; i++)
@@ -143,9 +147,9 @@ void GlobalPlanner::initialize(std::string name, costmap_2d::Costmap2D* costmap,
         plan_pub_ = private_nh.advertise<nav_msgs::Path>("plan", 1);
         potential_pub_ = private_nh.advertise<nav_msgs::OccupancyGrid>("potential", 1);
 
-        private_nh.param("allow_unknown", allow_unknown_, true);
+        private_nh.param("allow_unknown", allow_unknown_, true); //这个参数的目的是控制是否允许规划器处理未知区域。
         planner_->setHasUnknown(allow_unknown_);
-        private_nh.param("planner_window_x", planner_window_x_, 0.0);
+        private_nh.param("planner_window_x", planner_window_x_, 0.0); //这两个参数可能用于规划器的窗口大小或视窗位置。
         private_nh.param("planner_window_y", planner_window_y_, 0.0);
         private_nh.param("default_tolerance", default_tolerance_, 0.0);
         private_nh.param("publish_scale", publish_scale_, 100);
@@ -220,6 +224,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     return makePlan(start, goal, default_tolerance_, plan);
 }
 
+
 bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geometry_msgs::PoseStamped& goal,
                            double tolerance, std::vector<geometry_msgs::PoseStamped>& plan) {
     boost::mutex::scoped_lock lock(mutex_);
@@ -287,22 +292,26 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     }
 
     //clear the starting cell within the costmap because we know it can't be an obstacle
+    // 机器人当前所在格子的位置设置为free
     clearRobotCell(start, start_x_i, start_y_i);
 
+    // 获取地图尺寸
     int nx = costmap_->getSizeInCellsX(), ny = costmap_->getSizeInCellsY();
 
     //make sure to resize the underlying array that Navfn uses
+    // 初始化各种指针
     p_calc_->setSize(nx, ny);
     planner_->setSize(nx, ny);
     path_maker_->setSize(nx, ny);
     potential_array_ = new float[nx * ny];
 
+    // 将地图的边框设置成障碍物
     if(outline_map_)
         outlineMap(costmap_->getCharMap(), nx, ny, costmap_2d::LETHAL_OBSTACLE);
 
     bool found_legal = planner_->calculatePotentials(costmap_->getCharMap(), start_x, start_y, goal_x, goal_y,
                                                     nx * ny * 2, potential_array_);
-
+    // 清楚目标中周围的带价值
     if(!old_navfn_behavior_)
         planner_->clearEndpoint(costmap_->getCharMap(), potential_array_, goal_x_i, goal_y_i, 2);
     if(publish_potential_)
@@ -310,6 +319,7 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
 
     if (found_legal) {
         //extract the plan
+        // 提取全局路径规划的路径点 ，其角度信息全部为（0,0,0），保存在plan里
         if (getPlanFromPotential(start_x, start_y, goal_x, goal_y, goal, plan)) {
             //make sure the goal we push on has the same timestamp as the rest of the plan
             geometry_msgs::PoseStamped goal_copy = goal;
@@ -323,9 +333,11 @@ bool GlobalPlanner::makePlan(const geometry_msgs::PoseStamped& start, const geom
     }
 
     // add orientations if needed
+    // 增加角度信息，根据前后点的位置差，计算角度atan(dy, dx)
     orientation_filter_->processPath(start, plan);
 
     //publish the plan for visualization purposes
+    // 把路径发布出去
     publishPlan(plan);
     delete[] potential_array_;
     return !plan.empty();

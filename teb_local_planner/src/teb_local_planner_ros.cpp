@@ -129,7 +129,7 @@ void TebLocalPlannerROS::initialize(std::string name, tf2_ros::Buffer* tf, costm
 
     global_frame_ = costmap_ros_->getGlobalFrameID();
     cfg_.map_frame = global_frame_; // TODO
-    robot_base_frame_ = costmap_ros_->getBaseFrameID();
+    robot_base_frame_ = costmap_ros_->getBaseFrameID(); // base_link
 
     //Initialize a costmap to polygon converter
     if (!cfg_.obstacles.costmap_converter_plugin.empty())
@@ -246,26 +246,33 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   static uint32_t seq = 0;
   cmd_vel.header.seq = seq++;
   cmd_vel.header.stamp = ros::Time::now();
-  cmd_vel.header.frame_id = robot_base_frame_;
+  cmd_vel.header.frame_id = robot_base_frame_; // base_link
   cmd_vel.twist.linear.x = cmd_vel.twist.linear.y = cmd_vel.twist.angular.z = 0;
   goal_reached_ = false;  
   
   // Get robot pose
+  // 获取机器人在世界坐标下的位置
   geometry_msgs::PoseStamped robot_pose;
   costmap_ros_->getRobotPose(robot_pose);
+
   robot_pose_ = PoseSE2(robot_pose.pose);
     
   // Get robot velocity
   geometry_msgs::PoseStamped robot_vel_tf;
+
+  // 通过订阅 odom 话题，获取机器人当前的速度信息 
   odom_helper_.getRobotVel(robot_vel_tf);
   robot_vel_.linear.x = robot_vel_tf.pose.position.x;
   robot_vel_.linear.y = robot_vel_tf.pose.position.y;
   robot_vel_.angular.z = tf2::getYaw(robot_vel_tf.pose.orientation);
   
   // prune global plan to cut off parts of the past (spatially before the robot)
+  // 对全局路径规划进行修剪的功能，以去除机器人当前位置之前一定距离之外的路径点。
   pruneGlobalPlan(*tf_, robot_pose, global_plan_, cfg_.trajectory.global_plan_prune_distance);
 
   // Transform global plan to the frame of interest (w.r.t. the local costmap)
+
+  // 将全局路径转换到局部代价地图中，并将转换后的路径保存在 transformed_plan 中
   std::vector<geometry_msgs::PoseStamped> transformed_plan;
   int goal_idx;
   geometry_msgs::TransformStamped tf_plan_to_global;
@@ -305,6 +312,7 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   
     
   // Return false if the transformed global plan is empty
+  // 检查转换后的全局路径是否为空
   if (transformed_plan.empty())
   {
     ROS_WARN("Transformed plan is empty. Cannot determine a local plan.");
@@ -313,8 +321,11 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   }
               
   // Get current goal point (last point of the transformed plan)
+  // 获取当前目标点的位置和方向：
   robot_goal_.x() = transformed_plan.back().pose.position.x;
   robot_goal_.y() = transformed_plan.back().pose.position.y;
+
+
   // Overwrite goal orientation if needed
   if (cfg_.trajectory.global_plan_overwrite_orientation)
   {
@@ -330,8 +341,10 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   }
 
   // overwrite/update start of the transformed plan with the actual robot position (allows using the plan as initial trajectory)
+  // 确保转换后的全局路径 (transformed_plan) 的起始点与实际机器人的当前位置一致
   if (transformed_plan.size()==1) // plan only contains the goal
   {
+    // 在路径的开头插入一个未初始化的姿态，这是为了确保容器的大小增加到至少为2，使得路径同时包含起始点和目标点。
     transformed_plan.insert(transformed_plan.begin(), geometry_msgs::PoseStamped()); // insert start (not yet initialized)
   }
   transformed_plan.front() = robot_pose; // update start
@@ -340,12 +353,14 @@ uint32_t TebLocalPlannerROS::computeVelocityCommands(const geometry_msgs::PoseSt
   obstacles_.clear();
   
   // Update obstacle container with costmap information or polygons provided by a costmap_converter plugin
+  // 使用 costmap 信息或 costmap_converter 插件提供的多边形更新障碍物容器
   if (costmap_converter_)
     updateObstacleContainerWithCostmapConverter();
   else
     updateObstacleContainerWithCostmap();
   
   // also consider custom obstacles (must be called after other updates, since the container is not cleared)
+  //将通过消息传递的自定义障碍物信息添加到障碍物容器中，以便在路径规划中考虑这些障碍物。
   updateObstacleContainerWithCustomObstacles();
   
     
@@ -477,6 +492,7 @@ void TebLocalPlannerROS::updateObstacleContainerWithCostmap()
   // Add costmap obstacles if desired
   if (cfg_.obstacles.include_costmap_obstacles)
   {
+    // 获取机器人的朝向向量
     Eigen::Vector2d robot_orient = robot_pose_.orientationUnitVec();
     
     for (unsigned int i=0; i<costmap_->getSizeInCellsX()-1; ++i)
